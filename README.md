@@ -186,5 +186,16 @@ https://github.com/EOSIO/eosjs-ecc
 
 ECC 를 이용해서 소스내에서 만들수 있다. 
 
+```javascript
+const Eos = require('eosjs');
+
+const ecc = Eos.modules.ecc;
+
+ecc.randomKey().then(privateKey => {
+    console.log('privateKey', privateKey);
+    const publicKey = ecc.privateToPublic(privateKey);
+    console.log("publicKey", publicKey);
+});
+```
 
   
