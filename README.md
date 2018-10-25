@@ -17,6 +17,7 @@ https://www.inflearn.com/
 - https://github.com/EOSIO/eosjs-ecc
 
 ## 현재 만든 계정
+
   
 ## 준비 사항
 - NodeJs
@@ -198,4 +199,257 @@ ecc.randomKey().then(privateKey => {
 });
 ```
 
-  
+## getTableRows
+
+[json] => bool => false (true 일 경우 해쉬로 들어감) => true로 추천
+
+- Json을 true로 설정시 어떻게 나오는지 체크
+
+```javascript
+const Eos = require('eosjs');
+
+const config = {
+    httpEndpoint : "https://api-kylin.eosasia.one",
+    chainId : "5fff1dae8dc8e2fc4d5b23b2c7665c97f9e9d8edf2b6485a86ba311c25639191"
+}
+
+Eos(config).getTableRows({
+    json: true,
+    code: "eosio",
+    scope: "eosio",
+    table: "rammarket"
+}).then(tableInfo => {
+    console.log(tableInfo);
+}).catch(error => {
+    console.error(error);
+})
+
+.................
+{ rows:
+   [ { supply: '10000000000.0000 RAMCORE',
+       base: [Object],
+       quote: [Object] } ],
+  more: false }
+```  
+
+- json 을 false로 설정시 어떻게 나오지??
+    - 보다시피 해시된 값이 출력이 되고 있다.
+
+```javascript
+{ rows:
+   [ '00407a10f35a00000452414d434f5245b5fbdb3b0e0000000052414d00000000000000000000e03ffbb43b640300000004454f5300000000000000000000e03f' ],
+  more: false }
+```
+
+## getCurrentBalance
+
+- 해당 계정에 대한 잔액을 조회한다. 
+
+```javascript
+const Eos = require('eosjs');
+
+const config = {
+    httpEndpoint : "https://api-kylin.eosasia.one",
+    chainId : "5fff1dae8dc8e2fc4d5b23b2c7665c97f9e9d8edf2b6485a86ba311c25639191"
+}
+
+Eos(config).getCurrencyBalance("eosio.token", "zxcvbasdfg11", (error, result) => {
+    if(error) {
+        console.error(error);
+    }
+    console.log(result);
+});
+
+...........
+
+[ '57.8607 EOS' ]
+
+```
+
+## transfer
+EOS 를 전송시 사용된다. 
+
+- Symbol명 맞춰준다. 
+- active private key를 넣어준다. 
+- 방법은 5가지 
+    - transfer 이용
+    - transaction 이용
+    - 콜백 후에 다시 전송실행
+    - contract 정보를 불러와서 실행
+- 보낼때 금액 자리수는 소수점 4자리 필수!!
+
+```javascript
+
+const Eos = require('eosjs');
+
+const config = {
+    httpEndpoint : "https://api-kylin.eosasia.one",
+    chainId : "5fff1dae8dc8e2fc4d5b23b2c7665c97f9e9d8edf2b6485a86ba311c25639191",
+    keyProvider: ["5HsgSX9CngANSWT6J6voTAjCrUdSbYUz4BqhrRFx3kPXkVZC9XH"]
+};
+
+// 1번째 방법
+Eos(config).transfer('111111111abz', '111111111abk', '50.0000 EOS', 'test transfer')
+    .then(console.log).catch(console.error);
+
+
+// 2번째 방법
+Eos(config).transaction({
+    actions: [{
+    account: 'eosio.token',
+    name: 'transfer',
+    authorization: [{
+        actor: '111111111abz',
+        permission: 'active',
+    }],
+    data: {
+        from: '111111111abz',
+        to: '111111111abk',
+        quantity: '1.0000 EOS',
+        memo: 'test',
+    },
+    }]
+}).then(console.log).catch(console.error);
+
+// 3번째 방법
+//3
+Eos(config).transaction('eosio.token', (coin) => {
+    coin.transfer('111111111abz', '111111111abk', '1.0000 EOS', 'test transfer');
+}).then(console.log).catch(console.error);
+
+// 4번째 방법
+
+//4
+Eos(config).contract("eosio.token").then(coin => coin.transfer('111111111abz', '111111111abk', '1.0000 EOS', 'test transfer')).then(console.log).catch(console.error);
+
+...........
+{ broadcast: true,
+  transaction:
+   { compression: 'none',
+     transaction:
+      { expiration: '2018-10-24T21:51:14',
+        ref_block_num: 58849,
+        ref_block_prefix: 1194338712,
+        max_net_usage_words: 0,
+        max_cpu_usage_ms: 0,
+        delay_sec: 0,
+        context_free_actions: [],
+        actions: [Array],
+        transaction_extensions: [] },
+     signatures:
+      [ 'SIG_K1_KfEna6CXX5dMz4GoScE9Uazpam4Mchv5UF45kjyFvnX2TNk9YxFGwzeQie3zm3ZnHAqJnpzdNQHwKYx1AEobbHLpye8tyV' ] },
+  transaction_id: 'eca58f57a4ee02e52490bdd3888304a4ce1d0adb1ca6e4c1fa5f54f0d32a8a12',
+  processed:
+   { id: 'eca58f57a4ee02e52490bdd3888304a4ce1d0adb1ca6e4c1fa5f54f0d32a8a12',
+     receipt: { status: 'executed', cpu_usage_us: 1039, net_usage_words: 18 },
+     elapsed: 1039,
+     net_usage: 144,
+     scheduled: false,
+     action_traces: [ [Object] ],
+     except: null } }
+
+```
+
+## delegate
+
+- staking 실습
+- transfer: 나한테 보낼때는 0이다
+- transfer: 남한테 빌려줄때는 0, 아예 줄 때는 1
+- 빌려줄때는 스테이킹할때는 올라가지만 보유 eos는 그대로이다. 
+
+```javascript
+const Eos = require('eosjs');
+
+const config = {
+    httpEndpoint : "https://api-kylin.eosasia.one",
+    chainId : "5fff1dae8dc8e2fc4d5b23b2c7665c97f9e9d8edf2b6485a86ba311c25639191",
+    keyProvider: ["5HsgSX9CngANSWT6J6voTAjCrUdSbYUz4BqhrRFx3kPXkVZC9XH"]
+};
+
+Eos(config).transaction(tr => {
+    tr.delegatebw({
+        from: '111111111abz',
+        receiver: '111111111abz',
+        stake_cpu_quantity: '0.1000 EOS',
+        stake_net_quantity: '0.0000 EOS',
+        transfer: 0, //0은 빌려주는 것, 1은 주는 것, 0은 자신에게 보냄
+    })
+}).then(console.log).catch(console.error);
+```
+
+## undelegate
+
+- unstaking
+- stake 의 반대
+- unstake balance에 eos 비용이 올라감
+- delegate 할때 transfer 할때 빌려준것에 undelegate 해준다. 
+- 
+
+```javascript
+const Eos = require('eosjs');
+
+const config = {
+    httpEndpoint : "https://api-kylin.eosasia.one",
+    chainId : "5fff1dae8dc8e2fc4d5b23b2c7665c97f9e9d8edf2b6485a86ba311c25639191",
+    keyProvider: ["5HsgSX9CngANSWT6J6voTAjCrUdSbYUz4BqhrRFx3kPXkVZC9XH"]
+};
+
+Eos(config).transaction(tr => {
+    tr.undelegatebw({
+        from: '111111111abz',
+        receiver: '111111111abz', //빌려준 상대방 계정을 적게 되면 반환 처리한다.
+        unstake_cpu_quantity: '0.1000 EOS',
+        unstake_net_quantity: '0.0000 EOS',
+        transfer: 0,
+    })
+}).then(console.log).catch(console.error);
+```
+
+## Ram 구매 및 판매
+
+- Ram은 시세에 따라 다르고 사고 파는게 가능하다. 
+- byte 단위로 살수도 있고 eos 단위로 살수도 있다. 
+- Ram 구매,판매시 수량은 양수만 가능하다. 
+
+```javascript
+const Eos = require('eosjs');
+
+const config = {
+    httpEndpoint : "https://api-kylin.eosasia.one",
+    chainId : "5fff1dae8dc8e2fc4d5b23b2c7665c97f9e9d8edf2b6485a86ba311c25639191",
+    keyProvider: ["5HsgSX9CngANSWT6J6voTAjCrUdSbYUz4BqhrRFx3kPXkVZC9XH"]
+};
+
+//byte 기준으로 구매
+// Eos(config).transaction(tr => {
+//     tr.buyrambytes({
+//         payer: '111111111abz',
+//         receiver: '111111111abz',
+//         bytes: 8192
+//     })
+// }).then(console.log).catch(console.error);
+
+//eos 기준으로 구매
+// Eos(config).transaction(tr => {
+//     tr.buyram({
+//         payer: '111111111abz',
+//         receiver: '111111111abz',
+//         quant: '1.0000 EOS'
+//     })
+// }).then(console.log).catch(console.error);
+
+// 램판매
+// 소수점으로 안됨
+Eos(config).transaction(tr => {
+    tr.sellram({
+        account: '111111111abz',
+        bytes: 10000
+    })
+}).then(console.log).catch(console.error);
+```
+
+
+
+
+
+
